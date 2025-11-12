@@ -1,0 +1,202 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Check Point Harmony Email & Collaboration (Avanan) API - Curated",
+    "version": "v1.0-curated",
+    "description": "Practical subset for MSP automation: auth, security events (get/query), and exceptions (whitelist). Requires x-av-req-id and Bearer access token."
+  },
+  "servers": [
+    { "url": "https://cloudinfra-gw-us.portal.checkpoint.com/app/hec-api/v1.0", "description": "USA" },
+    { "url": "https://cloudinfra-gw.portal.checkpoint.com/app/hec-api/v1.0", "description": "Europe" },
+    { "url": "https://cloudinfra-gw.ca.portal.checkpoint.com/app/hec-api/v1.0", "description": "Canada" },
+    { "url": "https://cloudinfra-gw.ap.portal.checkpoint.com/app/hec-api/v1.0", "description": "Australia" }
+  ],
+  "components": {
+    "securitySchemes": {
+      "BearerAuth": { "type": "http", "scheme": "bearer" }
+    },
+    "parameters": {
+      "xAvReqId": {
+        "name": "x-av-req-id",
+        "in": "header",
+        "required": true,
+        "description": "UUID per request",
+        "schema": { "type": "string", "format": "uuid" }
+      }
+    },
+    "schemas": {
+      "AuthRequest": {
+        "type": "object",
+        "required": ["clientId", "clientSecret"],
+        "properties": {
+          "clientId": { "type": "string" },
+          "clientSecret": { "type": "string" }
+        }
+      },
+      "AuthResponse": {
+        "type": "object",
+        "properties": {
+          "access_token": { "type": "string" },
+          "expires_in": { "type": "integer" }
+        }
+      },
+      "ResponseEnvelope": {
+        "type": "object",
+        "properties": {
+          "responseEnvelope": {
+            "type": "object",
+            "properties": {
+              "requestId": { "type": "string" },
+              "responseCode": { "type": "integer" },
+              "responseText": { "type": "string" },
+              "additionalText": { "type": "string" },
+              "recordsNumber": { "type": "integer" },
+              "totalRecordsNumber": { "type": "integer" },
+              "scrollId": { "type": "string" }
+            }
+          }
+        }
+      },
+      "SecurityEvent": {
+        "type": "object",
+        "properties": {
+          "eventId": { "type": "string" },
+          "customerId": { "type": "string" },
+          "saas": { "type": "string" },
+          "entityId": { "type": "string" },
+          "state": { "type": "string" },
+          "type": { "type": "string" },
+          "confidenceIndicator": { "type": "string" },
+          "eventCreated": { "type": "string" },
+          "severity": { "type": "string" },
+          "description": { "type": "string" },
+          "data": { "type": "string" },
+          "additionalData": { "type": "object" },
+          "availableEventActions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "actionName": { "type": "string" },
+                "actionParameter": { "type": "object" }
+              }
+            }
+          },
+          "actions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "actionType": { "type": "string" },
+                "createTime": { "type": "string" },
+                "relatedEntityId": { "type": "string" }
+              }
+            }
+          }
+        }
+      },
+      "EventQueryRequest": {
+        "type": "object",
+        "properties": {
+          "customerId": { "type": "string" },
+          "saas": { "type": "string", "description": "e.g. office365_emails" },
+          "severity": { "type": "string" },
+          "type": { "type": "string" },
+          "state": { "type": "string" },
+          "fromTime": { "type": "string", "format": "date-time" },
+          "toTime": { "type": "string", "format": "date-time" },
+          "scrollId": { "type": "string" },
+          "limit": { "type": "integer", "default": 100 }
+        }
+      },
+      "WhitelistRuleCreate": {
+        "type": "object",
+        "properties": {
+          "description": { "type": "string" },
+          "entityType": { "type": "string", "description": "e.g., sender, domain, fileHash" },
+          "value": { "type": "string" },
+          "saas": { "type": "string" }
+        },
+        "required": ["entityType", "value"]
+      }
+    }
+  },
+  "security": [{ "BearerAuth": [] }],
+  "paths": {
+    "/auth/external": {
+      "post": {
+        "operationId": "getAccessToken",
+        "summary": "Obtain API access token",
+        "description": "Exchange clientId/clientSecret for access token.",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AuthRequest" } } } },
+        "responses": { "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AuthResponse" } } } } }
+      }
+    },
+    "/event/{eventId}": {
+      "get": {
+        "operationId": "getSecurityEvent",
+        "summary": "Get a specific security event",
+        "parameters": [
+          { "$ref": "#/components/parameters/xAvReqId" },
+          { "name": "eventId", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Event details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/ResponseEnvelope" },
+                    { "type": "object", "properties": { "responseData": { "type": "array", "items": { "$ref": "#/components/schemas/SecurityEvent" } } } }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/event/query": {
+      "post": {
+        "operationId": "querySecurityEvents",
+        "summary": "Search security events (paged via scrollId)",
+        "parameters": [{ "$ref": "#/components/parameters/xAvReqId" }],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/EventQueryRequest" } } }
+        },
+        "responses": {
+          "200": {
+            "description": "Events page",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/ResponseEnvelope" },
+                    { "type": "object", "properties": { "responseData": { "type": "array", "items": { "$ref": "#/components/schemas/SecurityEvent" } } } }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/exceptions/whitelist": {
+      "get": {
+        "operationId": "listWhitelist",
+        "summary": "List whitelist exceptions",
+        "parameters": [{ "$ref": "#/components/parameters/xAvReqId" }],
+        "responses": { "200": { "description": "Whitelist", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ResponseEnvelope" } } } } }
+      },
+      "post": {
+        "operationId": "createWhitelistRule",
+        "summary": "Create whitelist exception",
+        "parameters": [{ "$ref": "#/components/parameters/xAvReqId" }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/WhitelistRuleCreate" } } } },
+        "responses": { "201": { "description": "Created" } }
+      }
+    }
+  }
+}
